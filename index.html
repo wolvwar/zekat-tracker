@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zekat Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green-deep:   #0d3b1e;
+    --green-dark:   #1a5c30;
+    --green-mid:    #2e7d32;
+    --green-light:  #4caf50;
+    --green-pale:   #e8f5e9;
+    --green-mist:   #f0faf1;
+    --gold:         #c8a94e;
+    --gold-light:   #f5e6b8;
+    --gold-pale:    #fdfbf2;
+    --text-dark:    #1a2e1c;
+    --text-mid:     #3d5c3f;
+    --text-light:   #6a8c6c;
+    --border:       #c5dfc7;
+    --white:        #ffffff;
+    --shadow:       0 2px 16px rgba(13,59,30,0.10);
+    --shadow-lg:    0 8px 40px rgba(13,59,30,0.14);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: linear-gradient(160deg, #0d3b1e 0%, #1a5c30 40%, #2e7d32 100%);
+    min-height: 100vh;
+    color: var(--text-dark);
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: rgba(13,59,30,0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(200,169,78,0.3);
+    padding: 0 24px;
+    height: 64px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .logo-icon {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--gold), #e8c96e);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 2px 8px rgba(200,169,78,0.4);
+  }
+  .logo-text {
+    font-family: 'Amiri', serif;
+    font-size: 22px;
+    color: var(--white);
+    letter-spacing: 0.3px;
+  }
+  .logo-sub { font-size: 11px; color: rgba(255,255,255,0.5); letter-spacing: 1px; text-transform: uppercase; }
+
+  .header-right { display: flex; align-items: center; gap: 12px; }
+
+  .btn-drive {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(200,169,78,0.4);
+    color: var(--white);
+    padding: 7px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-drive:hover { background: rgba(200,169,78,0.2); }
+  .btn-drive.connected { border-color: var(--green-light); background: rgba(76,175,80,0.15); }
+  .btn-drive svg { width: 16px; height: 16px; }
+
+  .user-badge {
+    display: none;
+    align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    padding: 5px 12px 5px 6px;
+    color: var(--white);
+    font-size: 13px;
+  }
+  .user-badge img { width: 26px; height: 26px; border-radius: 50%; }
+  .user-badge.visible { display: flex; }
+
+  /* ── MAIN ── */
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 32px 20px 80px;
+  }
+
+  /* ── SUMMARY CARDS ── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  @media (max-width: 600px) { .summary-grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--white);
+    border-radius: 16px;
+    padding: 22px 24px;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  }
+  .card-gesamt::before { background: linear-gradient(90deg, var(--gold), #e8c96e); }
+  .card-gegeben::before { background: linear-gradient(90deg, var(--green-mid), var(--green-light)); }
+  .card-offen::before { background: linear-gradient(90deg, var(--green-deep), var(--green-dark)); }
+
+  .card-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 1.2px;
+    text-transform: uppercase; color: var(--text-light);
+    margin-bottom: 10px;
+  }
+  .card-amount {
+    font-family: 'Amiri', serif;
+    font-size: 32px; font-weight: 700;
+    line-height: 1;
+  }
+  .card-gesamt .card-amount { color: var(--gold); }
+  .card-gegeben .card-amount { color: var(--green-mid); }
+  .card-offen .card-amount { color: var(--green-deep); }
+  .card-sub { font-size: 12px; color: var(--text-light); margin-top: 6px; }
+
+  .progress-bar {
+    margin-top: 14px;
+    height: 5px; border-radius: 3px;
+    background: var(--green-pale);
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; border-radius: 3px;
+    background: linear-gradient(90deg, var(--green-mid), var(--green-light));
+    transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  /* ── GESAMT EDIT ── */
+  .gesamt-edit-row {
+    background: var(--gold-pale);
+    border: 1px solid var(--gold-light);
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .gesamt-edit-row label {
+    font-size: 13px; font-weight: 600; color: var(--text-mid);
+    white-space: nowrap;
+  }
+  .input-euro {
+    display: flex; align-items: center;
+    background: var(--white);
+    border: 1.5px solid var(--gold);
+    border-radius: 8px;
+    overflow: hidden;
+    flex: 1; min-width: 140px;
+  }
+  .input-euro span {
+    padding: 8px 12px;
+    background: var(--gold-light);
+    font-weight: 700; color: var(--gold);
+    font-size: 15px;
+  }
+  .input-euro input {
+    border: none; outline: none; padding: 8px 12px;
+    font-family: 'DM Sans', sans-serif; font-size: 15px;
+    width: 100%; color: var(--text-dark);
+    background: transparent;
+  }
+  .btn-save-gesamt {
+    background: linear-gradient(135deg, var(--gold), #d4a843);
+    color: var(--white);
+    border: none; border-radius: 8px;
+    padding: 9px 20px; font-size: 13px; font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer; transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-save-gesamt:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+  /* ── TABLE SECTION ── */
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+    flex-wrap: wrap; gap: 10px;
+  }
+  .section-title {
+    font-family: 'Amiri', serif;
+    font-size: 20px; color: var(--white);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-title::before {
+    content: '';
+    display: block; width: 4px; height: 20px;
+    background: var(--gold); border-radius: 2px;
+  }
+
+  .btn-add {
+    display: flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, var(--gold), #d4a843);
+    color: var(--white); border: none; border-radius: 10px;
+    padding: 10px 20px; font-size: 14px; font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer; transition: all 0.2s;
+    box-shadow: 0 3px 12px rgba(200,169,78,0.4);
+  }
+  .btn-add:hover { transform: translateY(-2px); box-shadow: 0 5px 18px rgba(200,169,78,0.5); }
+
+  /* ── ADD FORM ── */
+  .add-form {
+    background: var(--white);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+    display: none;
+    animation: slideDown 0.2s ease;
+  }
+  .add-form.open { display: block; }
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+
+  .form-group label {
+    display: block; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.8px; text-transform: uppercase;
+    color: var(--text-light); margin-bottom: 6px;
+  }
+  .form-group input, .form-group textarea {
+    width: 100%; padding: 9px 13px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px; outline: none;
+    font-family: 'DM Sans', sans-serif; font-size: 14px;
+    color: var(--text-dark); transition: border 0.2s;
+    background: var(--white);
+  }
+  .form-group input:focus, .form-group textarea:focus {
+    border-color: var(--green-mid);
+  }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+  .btn-confirm {
+    background: var(--green-mid); color: var(--white);
+    border: none; border-radius: 8px; padding: 9px 22px;
+    font-size: 14px; font-weight: 600; font-family: 'DM Sans', sans-serif;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn-confirm:hover { background: var(--green-dark); }
+
+  .btn-cancel {
+    background: var(--green-pale); color: var(--text-mid);
+    border: none; border-radius: 8px; padding: 9px 18px;
+    font-size: 14px; font-weight: 500; font-family: 'DM Sans', sans-serif;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn-cancel:hover { background: var(--border); }
+
+  /* ── PAYMENTS TABLE ── */
+  .table-wrap {
+    background: var(--white);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    background: var(--green-deep);
+    color: var(--white);
+    font-size: 11px; font-weight: 600; letter-spacing: 1px;
+    text-transform: uppercase; padding: 13px 16px;
+    text-align: left;
+  }
+  thead th:last-child { text-align: center; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--green-mist);
+    transition: background 0.15s;
+  }
+  tbody tr:hover { background: var(--green-mist); }
+  tbody tr:last-child { border-bottom: none; }
+
+  td {
+    padding: 13px 16px;
+    font-size: 14px; color: var(--text-dark);
+    vertical-align: middle;
+  }
+  td.nr { color: var(--text-light); font-size: 12px; font-weight: 600; width: 40px; }
+  td.amount {
+    font-family: 'Amiri', serif; font-size: 16px;
+    font-weight: 700; color: var(--green-dark);
+    white-space: nowrap;
+  }
+  td.note { color: var(--text-light); font-size: 13px; max-width: 180px; }
+  td.actions { text-align: center; width: 50px; }
+
+  .btn-delete {
+    background: none; border: none;
+    color: #ccc; font-size: 16px; cursor: pointer;
+    padding: 4px 8px; border-radius: 6px;
+    transition: all 0.2s;
+  }
+  .btn-delete:hover { color: #e53935; background: #ffeaea; }
+
+  .empty-state {
+    text-align: center; padding: 48px 24px;
+  }
+  .empty-state .emoji { font-size: 40px; margin-bottom: 14px; }
+  .empty-state p { color: var(--text-light); font-size: 14px; }
+
+  /* ── TOAST ── */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--green-deep); color: var(--white);
+    padding: 12px 20px; border-radius: 10px;
+    font-size: 13px; font-weight: 500;
+    box-shadow: var(--shadow-lg);
+    transform: translateY(80px); opacity: 0;
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    z-index: 999;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.gold { background: linear-gradient(135deg, var(--gold), #c8a030); }
+  .toast.error { background: #c62828; }
+
+  /* ── OVERLAY ── */
+  .overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(13,59,30,0.7);
+    z-index: 200;
+    align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    background: var(--white); border-radius: 18px;
+    padding: 36px 32px; max-width: 420px; width: 100%;
+    box-shadow: var(--shadow-lg);
+    text-align: center;
+  }
+  .modal h2 {
+    font-family: 'Amiri', serif; font-size: 24px;
+    color: var(--green-deep); margin-bottom: 10px;
+  }
+  .modal p { font-size: 14px; color: var(--text-mid); line-height: 1.6; margin-bottom: 24px; }
+  .modal-btn-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+  .btn-google {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--white); color: var(--text-dark);
+    border: 1.5px solid var(--border);
+    border-radius: 10px; padding: 11px 22px;
+    font-size: 14px; font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer; transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .btn-google:hover { border-color: var(--green-mid); background: var(--green-mist); }
+
+  .btn-local {
+    background: var(--green-pale); color: var(--green-dark);
+    border: 1.5px solid var(--border); border-radius: 10px;
+    padding: 11px 22px; font-size: 14px; font-weight: 600;
+    font-family: 'DM Sans', sans-serif; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-local:hover { background: var(--border); }
+
+  .drive-status {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: rgba(255,255,255,0.6);
+    font-weight: 500;
+  }
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #ccc;
+  }
+  .status-dot.synced { background: var(--green-light); }
+  .status-dot.syncing { background: var(--gold); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .hijri-note {
+    font-size: 11px; color: var(--text-light);
+    text-align: right; margin-top: 10px;
+  }
+
+  /* mobile */
+  @media (max-width: 500px) {
+    header { padding: 0 16px; }
+    main { padding: 20px 14px 60px; }
+    .card-amount { font-size: 26px; }
+    thead th:nth-child(5), td:nth-child(5) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">☪</div>
+    <div>
+      <div class="logo-text">Zekat Tracker</div>
+      <div class="logo-sub">زكاة</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="drive-status">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">Nicht verbunden</span>
+    </div>
+    <button class="btn-drive" id="btnConnect" onclick="showConnectModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+      </svg>
+      Mit Drive verbinden
+    </button>
+    <div class="user-badge" id="userBadge">
+      <img id="userPhoto" src="" alt="">
+      <span id="userName"></span>
+    </div>
+  </div>
+</header>
+
+<!-- CONNECT MODAL -->
+<div class="overlay" id="connectModal">
+  <div class="modal">
+    <h2>☪ Mit Google Drive verbinden</h2>
+    <p>Deine Zekat-Daten werden sicher in deinem persönlichen Google Drive gespeichert. Niemand außer dir hat Zugriff.</p>
+
+    <!-- Step indicator -->
+    <div id="modalStep1">
+      <div style="background:var(--green-pale);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:18px;text-align:left">
+        <div style="font-size:12px;font-weight:600;color:var(--text-mid);margin-bottom:6px">① Google Client-ID eintragen</div>
+        <div style="font-size:12px;color:var(--text-light);margin-bottom:10px">
+          Hol dir die ID kostenlos auf
+          <a href="https://console.cloud.google.com/" target="_blank" style="color:var(--green-mid);font-weight:600">console.cloud.google.com</a>
+          (Anleitung steht unten ↓)
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="clientIdInput"
+            placeholder="xxxxx.apps.googleusercontent.com"
+            style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;
+                   font-size:13px;font-family:'DM Sans',sans-serif;outline:none;
+                   color:var(--text-dark);background:var(--white)"
+            onfocus="this.style.borderColor='var(--green-mid)'"
+            onblur="this.style.borderColor='var(--border)'"
+            onkeydown="if(event.key==='Enter')saveClientId()">
+          <button onclick="saveClientId()"
+            style="background:var(--green-mid);color:#fff;border:none;border-radius:8px;
+                   padding:9px 16px;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;
+                   cursor:pointer;white-space:nowrap">
+            Speichern
+          </button>
+        </div>
+        <div id="clientIdStatus" style="font-size:11px;margin-top:6px;min-height:16px"></div>
+      </div>
+
+      <!-- Collapsible how-to -->
+      <details style="margin-bottom:16px;text-align:left">
+        <summary style="font-size:12px;font-weight:600;color:var(--text-mid);cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px">
+          <span id="detailsArrow" style="transition:transform 0.2s">▶</span> Wie bekomme ich die Client-ID?
+        </summary>
+        <div style="margin-top:10px;font-size:12px;color:var(--text-mid);line-height:1.8;background:var(--green-mist);border-radius:8px;padding:12px 14px">
+          <b>1.</b> <a href="https://console.cloud.google.com/projectcreate" target="_blank" style="color:var(--green-mid)">Neues Projekt erstellen</a> → Name: „Zekat Tracker"<br>
+          <b>2.</b> APIs &amp; Dienste → OAuth-Zustimmungsbildschirm → Extern → Speichern<br>
+          <b>3.</b> Anmeldedaten → + Erstellen → OAuth-Client-ID → Webanwendung<br>
+          <b>4.</b> Bei „Autorisierte JavaScript-Ursprünge" eintragen:<br>
+          &nbsp;&nbsp;&nbsp;<code style="background:var(--border);padding:1px 6px;border-radius:4px">file://</code> (wenn du die Datei lokal öffnest)<br>
+          <b>5.</b> Client-ID kopieren &amp; oben einfügen ✓
+        </div>
+      </details>
+
+      <div class="modal-btn-row">
+        <button class="btn-google" id="btnGoogleLogin" onclick="connectDrive()" disabled
+          style="opacity:0.5;cursor:not-allowed">
+          <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Mit Google anmelden
+        </button>
+        <button class="btn-local" onclick="useLocal()">Ohne Drive (lokal)</button>
+      </div>
+    </div>
+
+    <p style="font-size:11px;color:#aaa;margin:14px 0 0">Die Client-ID wird nur in deinem Browser gespeichert.</p>
+  </div>
+</div>
+
+<!-- MAIN -->
+<main>
+
+  <!-- SUMMARY -->
+  <div class="summary-grid">
+    <div class="card card-gesamt">
+      <div class="card-label">Gesamt Zekat</div>
+      <div class="card-amount" id="dispGesamt">0,00 €</div>
+      <div class="card-sub">Von dir berechnet</div>
+    </div>
+    <div class="card card-gegeben">
+      <div class="card-label">Gegeben</div>
+      <div class="card-amount" id="dispGegeben">0,00 €</div>
+      <div class="card-sub" id="dispAnzahl">0 Zahlungen</div>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+    <div class="card card-offen">
+      <div class="card-label">Noch offen</div>
+      <div class="card-amount" id="dispOffen">0,00 €</div>
+      <div class="card-sub" id="dispProzent">0 % gegeben</div>
+    </div>
+  </div>
+
+  <!-- GESAMT EDIT -->
+  <div class="gesamt-edit-row">
+    <label>☪ Mein Zekat-Betrag:</label>
+    <div class="input-euro">
+      <span>€</span>
+      <input type="number" id="gesamtInput" placeholder="0.00" step="0.01" min="0">
+    </div>
+    <button class="btn-save-gesamt" onclick="saveGesamt()">Speichern</button>
+  </div>
+
+  <!-- PAYMENTS -->
+  <div class="section-header">
+    <div class="section-title">Zahlungen</div>
+    <button class="btn-add" onclick="toggleForm()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Zahlung hinzufügen
+    </button>
+  </div>
+
+  <!-- ADD FORM -->
+  <div class="add-form" id="addForm">
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Datum</label>
+        <input type="date" id="fDatum">
+      </div>
+      <div class="form-group">
+        <label>Empfänger</label>
+        <input type="text" id="fEmpfaenger" placeholder="z.B. Moschee, Familie…">
+      </div>
+      <div class="form-group">
+        <label>Betrag (€)</label>
+        <input type="number" id="fBetrag" placeholder="0.00" step="0.01" min="0">
+      </div>
+      <div class="form-group full">
+        <label>Notiz / Zweck (optional)</label>
+        <input type="text" id="fNotiz" placeholder="z.B. Zakat al-Fitr, Bedürftige Familie…">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" onclick="toggleForm()">Abbrechen</button>
+      <button class="btn-confirm" onclick="addPayment()">Eintragen</button>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:40px">#</th>
+          <th>Datum</th>
+          <th>Empfänger</th>
+          <th>Betrag</th>
+          <th>Notiz</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="paymentsBody">
+        <tr><td colspan="6"><div class="empty-state"><div class="emoji">🌙</div><p>Noch keine Zahlungen eingetragen.</p></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="hijri-note" id="hijriNote"></div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────
+let state = {
+  gesamt: 0,
+  payments: [],
+  driveFileId: null,
+  driveConnected: false,
+  accessToken: null,
+};
+
+const FILE_NAME = 'zekat_tracker_data.json';
+let CLIENT_ID = localStorage.getItem('zekat_client_id') || '';
+const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+window.onload = () => {
+  loadLocal();
+  setDefaultDate();
+  showHijriDate();
+  render();
+
+  // Pre-fill client ID input if saved
+  const savedId = localStorage.getItem('zekat_client_id');
+  if (savedId) {
+    document.getElementById('clientIdInput').value = savedId;
+    enableGoogleButton(true);
+  }
+
+  const token = sessionStorage.getItem('gToken');
+  if (token) {
+    state.accessToken = token;
+    state.driveConnected = true;
+    updateDriveUI(true);
+    syncFromDrive();
+  } else {
+    showConnectModal();
+  }
+};
+
+function setDefaultDate() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('fDatum').value = today;
+}
+
+// ── LOCAL STORAGE ──────────────────────────────────────────────────────────
+function saveLocal() {
+  localStorage.setItem('zekat_state', JSON.stringify(state));
+}
+function loadLocal() {
+  const s = localStorage.getItem('zekat_state');
+  if (s) {
+    const parsed = JSON.parse(s);
+    state.gesamt = parsed.gesamt || 0;
+    state.payments = parsed.payments || [];
+    state.driveFileId = parsed.driveFileId || null;
+    document.getElementById('gesamtInput').value = state.gesamt || '';
+  }
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────────────
+function fmt(n) {
+  return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+}
+
+function render() {
+  const gegeben = state.payments.reduce((s, p) => s + p.betrag, 0);
+  const offen = Math.max(0, state.gesamt - gegeben);
+  const pct = state.gesamt > 0 ? Math.min(100, (gegeben / state.gesamt) * 100) : 0;
+
+  document.getElementById('dispGesamt').textContent = fmt(state.gesamt);
+  document.getElementById('dispGegeben').textContent = fmt(gegeben);
+  document.getElementById('dispOffen').textContent = fmt(offen);
+  document.getElementById('dispAnzahl').textContent = state.payments.length + ' Zahlungen';
+  document.getElementById('dispProzent').textContent = pct.toFixed(1) + ' % gegeben';
+  document.getElementById('progressFill').style.width = pct + '%';
+
+  const tbody = document.getElementById('paymentsBody');
+  if (state.payments.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><div class="emoji">🌙</div><p>Noch keine Zahlungen eingetragen.</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = state.payments.map((p, i) => `
+    <tr>
+      <td class="nr">${i + 1}</td>
+      <td>${formatDate(p.datum)}</td>
+      <td><strong>${escHtml(p.empfaenger)}</strong></td>
+      <td class="amount">${fmt(p.betrag)}</td>
+      <td class="note">${escHtml(p.notiz || '—')}</td>
+      <td class="actions"><button class="btn-delete" onclick="deletePayment(${i})" title="Löschen">✕</button></td>
+    </tr>
+  `).join('');
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatDate(d) {
+  if (!d) return '—';
+  const [y,m,day] = d.split('-');
+  return `${day}.${m}.${y}`;
+}
+
+// ── ACTIONS ────────────────────────────────────────────────────────────────
+function saveGesamt() {
+  const val = parseFloat(document.getElementById('gesamtInput').value);
+  if (isNaN(val) || val < 0) { toast('Bitte gültigen Betrag eingeben', 'error'); return; }
+  state.gesamt = val;
+  render(); saveLocal(); syncToDrive();
+  toast('Gesamt-Zekat gespeichert ✓', 'gold');
+}
+
+function toggleForm() {
+  const f = document.getElementById('addForm');
+  f.classList.toggle('open');
+}
+
+function addPayment() {
+  const datum = document.getElementById('fDatum').value;
+  const empfaenger = document.getElementById('fEmpfaenger').value.trim();
+  const betrag = parseFloat(document.getElementById('fBetrag').value);
+  const notiz = document.getElementById('fNotiz').value.trim();
+
+  if (!datum) { toast('Bitte Datum angeben', 'error'); return; }
+  if (!empfaenger) { toast('Bitte Empfänger angeben', 'error'); return; }
+  if (isNaN(betrag) || betrag <= 0) { toast('Bitte gültigen Betrag angeben', 'error'); return; }
+
+  state.payments.push({ datum, empfaenger, betrag, notiz, id: Date.now() });
+  document.getElementById('fEmpfaenger').value = '';
+  document.getElementById('fBetrag').value = '';
+  document.getElementById('fNotiz').value = '';
+  document.getElementById('addForm').classList.remove('open');
+
+  render(); saveLocal(); syncToDrive();
+  toast('Zahlung eingetragen – BarakAllahu fik 🤲');
+}
+
+function deletePayment(i) {
+  if (!confirm('Diese Zahlung löschen?')) return;
+  state.payments.splice(i, 1);
+  render(); saveLocal(); syncToDrive();
+  toast('Zahlung gelöscht');
+}
+
+// ── GOOGLE DRIVE ───────────────────────────────────────────────────────────
+function showConnectModal() {
+  document.getElementById('connectModal').classList.add('show');
+  document.querySelectorAll('details').forEach(d => {
+    d.addEventListener('toggle', () => {
+      const arrow = document.getElementById('detailsArrow');
+      if (arrow) arrow.style.transform = d.open ? 'rotate(90deg)' : '';
+    });
+  });
+}
+function hideModal() {
+  document.getElementById('connectModal').classList.remove('show');
+}
+
+function enableGoogleButton(enabled) {
+  const btn = document.getElementById('btnGoogleLogin');
+  if (!btn) return;
+  btn.disabled = !enabled;
+  btn.style.opacity = enabled ? '1' : '0.5';
+  btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+}
+
+function saveClientId() {
+  const val = document.getElementById('clientIdInput').value.trim();
+  const status = document.getElementById('clientIdStatus');
+  if (!val || !val.includes('.apps.googleusercontent.com')) {
+    status.textContent = '⚠ Bitte eine gültige Client-ID eintragen (endet auf .apps.googleusercontent.com)';
+    status.style.color = '#c62828';
+    return;
+  }
+  CLIENT_ID = val;
+  localStorage.setItem('zekat_client_id', val);
+  status.textContent = '✓ Client-ID gespeichert – jetzt anmelden!';
+  status.style.color = 'var(--green-mid)';
+  enableGoogleButton(true);
+}
+
+function useLocal() {
+  hideModal();
+  toast('Lokaler Modus – Daten nur auf diesem Gerät');
+}
+
+function connectDrive() {
+  if (!CLIENT_ID) { toast('Bitte zuerst die Client-ID eintragen', 'error'); return; }
+  hideModal();
+  const params = new URLSearchParams({
+    client_id: CLIENT_ID,
+    redirect_uri: window.location.href.split('?')[0].split('#')[0],
+    response_type: 'token',
+    scope: SCOPE,
+    include_granted_scopes: 'true',
+  });
+  window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params;
+}
+
+// Handle OAuth redirect
+(function handleOAuthRedirect() {
+  const hash = window.location.hash;
+  if (hash.includes('access_token')) {
+    const params = new URLSearchParams(hash.slice(1));
+    const token = params.get('access_token');
+    if (token) {
+      sessionStorage.setItem('gToken', token);
+      state.accessToken = token;
+      state.driveConnected = true;
+      window.history.replaceState({}, document.title, window.location.pathname);
+      updateDriveUI(true);
+      // Fetch user info
+      fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: 'Bearer ' + token }
+      }).then(r => r.json()).then(info => {
+        const badge = document.getElementById('userBadge');
+        badge.classList.add('visible');
+        document.getElementById('userPhoto').src = info.picture || '';
+        document.getElementById('userName').textContent = info.name?.split(' ')[0] || '';
+      }).catch(() => {});
+      syncFromDrive();
+    }
+  }
+})();
+
+function updateDriveUI(connected) {
+  const btn = document.getElementById('btnConnect');
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  if (connected) {
+    btn.classList.add('connected');
+    btn.textContent = '✓ Drive verbunden';
+    dot.className = 'status-dot synced';
+    txt.textContent = 'Drive aktiv';
+  }
+}
+
+function setStatus(mode) {
+  const dot = document.getElementById('statusDot');
+  const txt = document.getElementById('statusText');
+  if (mode === 'syncing') { dot.className = 'status-dot syncing'; txt.textContent = 'Synchronisiert…'; }
+  else if (mode === 'synced') { dot.className = 'status-dot synced'; txt.textContent = 'Drive aktiv'; }
+  else { dot.className = 'status-dot'; txt.textContent = 'Nicht verbunden'; }
+}
+
+async function syncToDrive() {
+  if (!state.accessToken) return;
+  setStatus('syncing');
+  const data = JSON.stringify({ gesamt: state.gesamt, payments: state.payments });
+
+  try {
+    if (state.driveFileId) {
+      // Update existing file
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${state.driveFileId}?uploadType=media`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: 'Bearer ' + state.accessToken,
+          'Content-Type': 'application/json',
+        },
+        body: data,
+      });
+    } else {
+      // Create file in appDataFolder
+      const meta = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + state.accessToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: FILE_NAME, parents: ['appDataFolder'] }),
+      }).then(r => r.json());
+
+      state.driveFileId = meta.id;
+      saveLocal();
+
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${meta.id}?uploadType=media`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: 'Bearer ' + state.accessToken,
+          'Content-Type': 'application/json',
+        },
+        body: data,
+      });
+    }
+    setStatus('synced');
+  } catch (e) {
+    console.error('Drive sync error:', e);
+    setStatus('synced');
+  }
+}
+
+async function syncFromDrive() {
+  if (!state.accessToken) return;
+  setStatus('syncing');
+  try {
+    // Find file
+    const list = await fetch(
+      `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${FILE_NAME}'`,
+      { headers: { Authorization: 'Bearer ' + state.accessToken } }
+    ).then(r => r.json());
+
+    if (list.files && list.files.length > 0) {
+      const fileId = list.files[0].id;
+      state.driveFileId = fileId;
+      const content = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+        { headers: { Authorization: 'Bearer ' + state.accessToken } }
+      ).then(r => r.json());
+
+      state.gesamt = content.gesamt || 0;
+      state.payments = content.payments || [];
+      document.getElementById('gesamtInput').value = state.gesamt || '';
+      saveLocal();
+      render();
+      toast('Daten aus Drive geladen ✓');
+    } else {
+      // No file yet, push current local data
+      syncToDrive();
+    }
+    setStatus('synced');
+  } catch (e) {
+    console.error('Drive read error:', e);
+    setStatus('synced');
+  }
+}
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+function toast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function showHijriDate() {
+  try {
+    const hj = new Intl.DateTimeFormat('ar-SA-u-ca-islamic', {
+      day: 'numeric', month: 'long', year: 'numeric'
+    }).format(new Date());
+    document.getElementById('hijriNote').textContent = 'Islamisches Datum: ' + hj;
+  } catch(e) {}
+}
+</script>
+
+<!-- SETUP GUIDE (shown in source) -->
+<!--
+═══════════════════════════════════════════════════════
+  EINRICHTUNG – Google Drive Verbindung aktivieren
+═══════════════════════════════════════════════════════
+
+1. Gehe zu: https://console.cloud.google.com/
+2. Neues Projekt erstellen (z.B. "Zekat Tracker")
+3. APIs & Dienste → OAuth-Zustimmungsbildschirm
+   - Typ: Extern → Speichern
+   - App-Name: Zekat Tracker
+4. APIs & Dienste → Anmeldedaten
+   - "+ Anmeldedaten erstellen" → OAuth-Client-ID
+   - Anwendungstyp: Webanwendung
+   - Autorisierte JavaScript-Ursprünge: Deine URL
+     z.B. file:// (für lokale Nutzung) oder deine Domain
+5. Die Client-ID kopieren
+6. In dieser Datei suchen: "YOUR_GOOGLE_CLIENT_ID"
+   Und ersetzen durch deine echte Client-ID
+
+Fertig! Die App speichert dann alles automatisch
+in deinem Google Drive unter "App-Daten" (appDataFolder).
+Niemand außer dir kann darauf zugreifen.
+═══════════════════════════════════════════════════════
+-->
+</body>
+</html>
