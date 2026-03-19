@@ -377,7 +377,7 @@ td.acts{text-align:center;width:80px}
 let state={gesamt:0,payments:[],driveFileId:null,driveConnected:false,accessToken:null};
 const FILE_NAME='zekat_tracker_data.json';
 let CLIENT_ID=localStorage.getItem('zekat_client_id')||'1037137955243-56r46pmvne7339egd5ka9haqf2aitrf5.apps.googleusercontent.com';
-const SCOPE='https://www.googleapis.com/auth/drive.appdata';
+const SCOPE='https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file';
 let editIndex=-1;
 
 // OAuth-Redirect sofort prüfen — bevor onload läuft
@@ -546,7 +546,7 @@ function connectDrive(){
     response_type:'token',
     scope:SCOPE,
     include_granted_scopes:'true',
-    prompt:'select_account'
+    prompt:'consent'
   });
   window.location.href='https://accounts.google.com/o/oauth2/v2/auth?'+params;
 }
