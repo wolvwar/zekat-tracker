@@ -386,16 +386,27 @@ window.onload=()=>{
   showHijriDate();
   render();
 
-  const token=getValidToken();
-  if(token){
-    state.accessToken=token;state.driveConnected=true;
+  // Zuerst OAuth-Redirect prüfen (hat Vorrang)
+  if(window.location.hash.includes('access_token')){
+    handleOAuthRedirect();
+    return;
+  }
+
+  const token=localStorage.getItem('gToken');
+  const expiry=parseInt(localStorage.getItem('gTokenExpiry')||0);
+  const tokenGültig=token&&Date.now()<expiry;
+
+  if(tokenGültig){
+    state.accessToken=token;
+    state.driveConnected=true;
     updateDriveUI(true);
-    // Benutzer-Badge wiederherstellen
     const name=localStorage.getItem('gUserName');
     const pic=localStorage.getItem('gUserPic');
     if(name||pic) showUserBadge(name,pic);
     syncFromDrive();
   } else {
+    // Alten Token aufräumen und Modal zeigen
+    clearToken();
     showConnectModal();
   }
 };
@@ -523,18 +534,21 @@ function connectDrive(){
   window.location.href='https://accounts.google.com/o/oauth2/v2/auth?'+params;
 }
 
-// Token aus URL nach OAuth-Redirect verarbeiten
-(function(){
-  const hash=window.location.hash;
-  if(!hash.includes('access_token'))return;
-  const params=new URLSearchParams(hash.slice(1));
+function clearToken(){
+  localStorage.removeItem('gToken');
+  localStorage.removeItem('gTokenExpiry');
+  state.accessToken=null;
+  state.driveConnected=false;
+}
+
+function handleOAuthRedirect(){
+  const params=new URLSearchParams(window.location.hash.slice(1));
   const token=params.get('access_token');
   const expiresIn=parseInt(params.get('expires_in')||3600);
-  if(!token)return;
-  // Token + Ablaufzeit in localStorage speichern (überlebt Browser-Neustart)
-  const expiresAt=Date.now()+(expiresIn-60)*1000;
+  if(!token){showConnectModal();return;}
+  const expiresAt=Date.now()+(expiresIn-120)*1000;
   localStorage.setItem('gToken',token);
-  localStorage.setItem('gTokenExpiry',expiresAt);
+  localStorage.setItem('gTokenExpiry',String(expiresAt));
   state.accessToken=token;state.driveConnected=true;
   window.history.replaceState({},document.title,window.location.pathname);
   updateDriveUI(true);
@@ -545,7 +559,7 @@ function connectDrive(){
       showUserBadge(info.name,info.picture);
     }).catch(()=>{});
   syncFromDrive();
-})();
+}
 
 function showUserBadge(name,pic){
   document.getElementById('userBadge').classList.add('show');
@@ -553,15 +567,10 @@ function showUserBadge(name,pic){
   document.getElementById('userName').textContent=(name||'').split(' ')[0];
 }
 
-function getValidToken(){
+function getToken(){
   const token=localStorage.getItem('gToken');
   const expiry=parseInt(localStorage.getItem('gTokenExpiry')||0);
-  if(!token||Date.now()>expiry){
-    // Token abgelaufen — neu anmelden
-    localStorage.removeItem('gToken');
-    localStorage.removeItem('gTokenExpiry');
-    return null;
-  }
+  if(!token||Date.now()>expiry){clearToken();return null;}
   return token;
 }
 
@@ -587,22 +596,17 @@ function setStatus(m){
 }
 
 async function syncToDrive(){
-  const token=getValidToken();
-  if(!token){
-    // Token abgelaufen — still fail, Daten sind lokal gespeichert
-    setStatus('error');
-    return;
-  }
-  state.accessToken=token;
-  setStatus('syncing');
+  const token=getToken();
+  if(!token){updateDriveUI(false);showConnectModal();return;}
+  state.accessToken=token;setStatus('syncing');
   const data=JSON.stringify({gesamt:state.gesamt,payments:state.payments});
   try{
     if(state.driveFileId){
       const r=await fetch(`https://www.googleapis.com/upload/drive/v3/files/${state.driveFileId}?uploadType=media`,{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:data});
-      if(r.status===401){handleTokenExpired();return;}
+      if(r.status===401){clearToken();updateDriveUI(false);showConnectModal();return;}
     }else{
       const meta=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({name:FILE_NAME,parents:['appDataFolder']})}).then(r=>r.json());
-      if(meta.error){handleTokenExpired();return;}
+      if(meta.error){clearToken();updateDriveUI(false);showConnectModal();return;}
       state.driveFileId=meta.id;saveLocal();
       await fetch(`https://www.googleapis.com/upload/drive/v3/files/${meta.id}?uploadType=media`,{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:data});
     }
@@ -611,13 +615,12 @@ async function syncToDrive(){
 }
 
 async function syncFromDrive(){
-  const token=getValidToken();
-  if(!token){handleTokenExpired();return;}
-  state.accessToken=token;
-  setStatus('syncing');
+  const token=getToken();
+  if(!token){updateDriveUI(false);showConnectModal();return;}
+  state.accessToken=token;setStatus('syncing');
   try{
     const list=await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${FILE_NAME}'`,{headers:{Authorization:'Bearer '+token}}).then(r=>r.json());
-    if(list.error){handleTokenExpired();return;}
+    if(list.error&&list.error.code===401){clearToken();updateDriveUI(false);showConnectModal();return;}
     if(list.files&&list.files.length>0){
       const fid=list.files[0].id;state.driveFileId=fid;
       const c=await fetch(`https://www.googleapis.com/drive/v3/files/${fid}?alt=media`,{headers:{Authorization:'Bearer '+token}}).then(r=>r.json());
@@ -630,16 +633,7 @@ async function syncFromDrive(){
 }
 
 function handleTokenExpired(){
-  localStorage.removeItem('gToken');
-  localStorage.removeItem('gTokenExpiry');
-  state.accessToken=null;state.driveConnected=false;
-  updateDriveUI(false);
-  setStatus('error');
-  // Zeige Hinweis und erneute Anmeldung anbieten
-  const t=document.getElementById('toast');
-  t.innerHTML='Sitzung abgelaufen — <span onclick="connectDrive()" style="text-decoration:underline;cursor:pointer;color:var(--gold2)">Neu anmelden</span>';
-  t.className='toast show error';
-  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),6000);
+  clearToken();updateDriveUI(false);showConnectModal();
 }
 
 function toast(msg,type=''){
