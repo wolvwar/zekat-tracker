@@ -422,13 +422,17 @@ window.onload=()=>{
         }
       }).catch(()=>{});
     syncFromDrive();
+    startAutoSync();
   } else {
     clearToken();
     showConnectModal();
   }
 };
 
-function saveLocal(){localStorage.setItem('zekat_state',JSON.stringify(state));}
+function saveLocal(){
+  state.lastLocalModified=state.lastLocalModified||Date.now();
+  localStorage.setItem('zekat_state',JSON.stringify(state));
+}
 function loadLocal(){
   const s=localStorage.getItem('zekat_state');
   if(s){const p=JSON.parse(s);state.gesamt=p.gesamt||0;state.payments=p.payments||[];state.driveFileId=p.driveFileId||null;document.getElementById('gesamtInput').value=state.gesamt||'';}
@@ -498,6 +502,7 @@ function addPayment(){
   if(!empfaenger){toast('Bitte Empfänger angeben','error');return;}
   if(isNaN(betrag)||betrag<=0){toast('Bitte gültigen Betrag angeben','error');return;}
   state.payments.push({datum,empfaenger,betrag,notiz,id:Date.now()});
+  state.lastLocalModified=Date.now();
   document.getElementById('fEmpfaenger').value='';
   document.getElementById('fBetrag').value='';
   document.getElementById('fNotiz').value='';
@@ -618,7 +623,13 @@ async function syncToDrive(){
   const token=getToken();
   if(!token){updateDriveUI(false);showConnectModal();return;}
   state.accessToken=token;setStatus('syncing');
-  const data=JSON.stringify({gesamt:state.gesamt,payments:state.payments});
+  // Timestamp der letzten Änderung mitspeichern
+  const data=JSON.stringify({
+    gesamt:state.gesamt,
+    payments:state.payments,
+    lastModified:Date.now(),
+    deviceId:getDeviceId()
+  });
   try{
     if(state.driveFileId){
       const r=await fetch(`https://www.googleapis.com/upload/drive/v3/files/${state.driveFileId}?uploadType=media`,{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:data});
@@ -629,26 +640,86 @@ async function syncToDrive(){
       state.driveFileId=meta.id;saveLocal();
       await fetch(`https://www.googleapis.com/upload/drive/v3/files/${meta.id}?uploadType=media`,{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:data});
     }
+    state.lastSyncedModified=Date.now();
     setStatus('synced');
   }catch(e){console.error(e);setStatus('error');}
 }
 
-async function syncFromDrive(){
+async function syncFromDrive(silent=false){
   const token=getToken();
   if(!token){updateDriveUI(false);showConnectModal();return;}
-  state.accessToken=token;setStatus('syncing');
+  state.accessToken=token;
+  if(!silent)setStatus('syncing');
   try{
     const list=await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${FILE_NAME}'`,{headers:{Authorization:'Bearer '+token}}).then(r=>r.json());
     if(list.error&&list.error.code===401){clearToken();updateDriveUI(false);showConnectModal();return;}
     if(list.files&&list.files.length>0){
       const fid=list.files[0].id;state.driveFileId=fid;
       const c=await fetch(`https://www.googleapis.com/drive/v3/files/${fid}?alt=media`,{headers:{Authorization:'Bearer '+token}}).then(r=>r.json());
-      state.gesamt=c.gesamt||0;state.payments=c.payments||[];
-      document.getElementById('gesamtInput').value=state.gesamt||'';
-      saveLocal();render();toast('Daten aus Drive geladen ✓','gold');
+
+      // ── MERGE LOGIK ──
+      const driveModified=c.lastModified||0;
+      const driveDevice=c.deviceId||'';
+      const myDevice=getDeviceId();
+
+      // Nur mergen wenn Drive-Daten von einem anderen Gerät kommen
+      if(driveDevice!==myDevice && driveModified>0){
+        const merged=mergePayments(state.payments, c.payments||[]);
+        const gesamtChanged=c.gesamt!==state.gesamt;
+
+        if(merged.newItems>0||gesamtChanged){
+          state.payments=merged.payments;
+          // Gesamt: neuere Version gewinnt
+          if(driveModified>(state.lastLocalModified||0)){
+            state.gesamt=c.gesamt||state.gesamt;
+            document.getElementById('gesamtInput').value=state.gesamt||'';
+          }
+          saveLocal();render();
+          if(!silent)toast(`${merged.newItems} neue Zahlung(en) synchronisiert ✓`,'gold');
+          // Merged-Version zurück in Drive speichern
+          await syncToDrive();
+          return;
+        }
+      } else if(driveDevice===myDevice||driveModified===0){
+        // Erstes Laden: Drive-Daten übernehmen
+        state.gesamt=c.gesamt||0;
+        state.payments=c.payments||[];
+        document.getElementById('gesamtInput').value=state.gesamt||'';
+        saveLocal();render();
+        if(!silent)toast('Daten aus Drive geladen ✓','gold');
+      }
     }else{syncToDrive();}
     setStatus('synced');
   }catch(e){console.error(e);setStatus('error');}
+}
+
+function mergePayments(local, remote){
+  // Alle IDs sammeln
+  const localIds=new Set(local.map(p=>p.id));
+  const remoteIds=new Set(remote.map(p=>p.id));
+  // Neue Einträge vom anderen Gerät
+  const newFromRemote=remote.filter(p=>!localIds.has(p.id));
+  // Zusammenführen und nach Datum sortieren
+  const merged=[...local,...newFromRemote].sort((a,b)=>{
+    if(a.datum&&b.datum) return a.datum.localeCompare(b.datum);
+    return (a.id||0)-(b.id||0);
+  });
+  return{payments:merged, newItems:newFromRemote.length};
+}
+
+function getDeviceId(){
+  let id=localStorage.getItem('deviceId');
+  if(!id){id='dev_'+Math.random().toString(36).slice(2);localStorage.setItem('deviceId',id);}
+  return id;
+}
+
+// Auto-Refresh alle 30 Sekunden im Hintergrund
+function startAutoSync(){
+  setInterval(()=>{
+    if(state.driveConnected&&getToken()){
+      syncFromDrive(true); // silent=true, kein Toast
+    }
+  }, 30000);
 }
 
 function handleTokenExpired(){
