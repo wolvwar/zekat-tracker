@@ -488,11 +488,41 @@ function markModified(){
   state.deviceId=getDeviceId();
 }
 
+// Vor jeder Aktion kurz aus Drive lesen und dann Aktion ausführen
+async function syncBeforeAction(action){
+  if(!state.driveConnected||!getToken()){action();return;}
+  setStatus('syncing');
+  try{
+    const token=getToken();
+    const list=await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${FILE_NAME}'`,{headers:{Authorization:'Bearer '+token}}).then(r=>r.json());
+    if(list.files&&list.files.length>0){
+      const fid=list.files[0].id;
+      const c=await fetch(`https://www.googleapis.com/drive/v3/files/${fid}?alt=media`,{headers:{Authorization:'Bearer '+token}}).then(r=>r.json());
+      const driveModified=c.lastModified||0;
+      const localModified=state.lastModified||0;
+      const driveDevice=c.deviceId||'';
+      const myDevice=getDeviceId();
+      // Nur übernehmen wenn anderes Gerät neuere Daten hat
+      if(driveDevice!==myDevice&&driveModified>localModified){
+        state.gesamt=c.gesamt||0;
+        state.payments=c.payments||[];
+        state.lastModified=driveModified;
+        state.deviceId=driveDevice;
+        document.getElementById('gesamtInput').value=state.gesamt||'';
+        saveLocal();render();
+      }
+    }
+  }catch(e){console.error('Pre-sync error:',e);}
+  action();
+}
+
 function saveGesamt(){
   const val=parseFloat(document.getElementById('gesamtInput').value);
   if(isNaN(val)||val<0){toast('Bitte gültigen Betrag eingeben','error');return;}
-  state.gesamt=val;markModified();render();saveLocal();syncToDrive();
-  toast('Gesamt-Zekat gespeichert ✓','gold');
+  syncBeforeAction(()=>{
+    state.gesamt=val;markModified();render();saveLocal();syncToDrive();
+    toast('Gesamt-Zekat gespeichert ✓','gold');
+  });
 }
 
 function toggleForm(){document.getElementById('addForm').classList.toggle('open');}
@@ -505,14 +535,16 @@ function addPayment(){
   if(!datum){toast('Bitte Datum angeben','error');return;}
   if(!empfaenger){toast('Bitte Empfänger angeben','error');return;}
   if(isNaN(betrag)||betrag<=0){toast('Bitte gültigen Betrag angeben','error');return;}
-  state.payments.push({datum,empfaenger,betrag,notiz,id:Date.now()});
-  markModified();
-  document.getElementById('fEmpfaenger').value='';
-  document.getElementById('fBetrag').value='';
-  document.getElementById('fNotiz').value='';
-  document.getElementById('addForm').classList.remove('open');
-  render();saveLocal();syncToDrive();
-  toast('BarakAllahu fik 🤲 Zahlung eingetragen');
+  syncBeforeAction(()=>{
+    state.payments.push({datum,empfaenger,betrag,notiz,id:Date.now()});
+    markModified();
+    document.getElementById('fEmpfaenger').value='';
+    document.getElementById('fBetrag').value='';
+    document.getElementById('fNotiz').value='';
+    document.getElementById('addForm').classList.remove('open');
+    render();saveLocal();syncToDrive();
+    toast('BarakAllahu fik 🤲 Zahlung eingetragen');
+  });
 }
 
 function openEditModal(i){
@@ -533,17 +565,21 @@ function saveEdit(){
   if(!datum){toast('Bitte Datum angeben','error');return;}
   if(!empfaenger){toast('Bitte Empfänger angeben','error');return;}
   if(isNaN(betrag)||betrag<=0){toast('Bitte gültigen Betrag angeben','error');return;}
-  state.payments[editIndex]={...state.payments[editIndex],datum,empfaenger,betrag,notiz};
-  markModified();
-  closeEditModal();render();saveLocal();syncToDrive();
-  toast('Zahlung aktualisiert ✓');
+  syncBeforeAction(()=>{
+    state.payments[editIndex]={...state.payments[editIndex],datum,empfaenger,betrag,notiz};
+    markModified();
+    closeEditModal();render();saveLocal();syncToDrive();
+    toast('Zahlung aktualisiert ✓');
+  });
 }
 function deletePayment(i){
   if(!confirm('Diese Zahlung löschen?'))return;
-  state.payments.splice(i,1);
-  markModified();
-  render();saveLocal();syncToDrive();
-  toast('Zahlung gelöscht');
+  syncBeforeAction(()=>{
+    state.payments.splice(i,1);
+    markModified();
+    render();saveLocal();syncToDrive();
+    toast('Zahlung gelöscht');
+  });
 }
 
 function showConnectModal(){document.getElementById('connectModal').classList.add('show');}
