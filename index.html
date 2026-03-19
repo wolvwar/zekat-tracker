@@ -380,21 +380,31 @@ let CLIENT_ID=localStorage.getItem('zekat_client_id')||'1037137955243-56r46pmvne
 const SCOPE='https://www.googleapis.com/auth/drive.appdata';
 let editIndex=-1;
 
+// OAuth-Redirect sofort prüfen — bevor onload läuft
+(function(){
+  if(!window.location.hash.includes('access_token'))return;
+  const params=new URLSearchParams(window.location.hash.slice(1));
+  const token=params.get('access_token');
+  const expiresIn=parseInt(params.get('expires_in')||3600);
+  if(!token)return;
+  const expiresAt=Date.now()+(expiresIn-120)*1000;
+  localStorage.setItem('gToken',token);
+  localStorage.setItem('gTokenExpiry',String(expiresAt));
+  window.history.replaceState({},document.title,window.location.pathname);
+})();
+
 window.onload=()=>{
   loadLocal();
   document.getElementById('fDatum').value=new Date().toISOString().split('T')[0];
   showHijriDate();
   render();
 
-  // Zuerst OAuth-Redirect prüfen (hat Vorrang)
-  if(window.location.hash.includes('access_token')){
-    handleOAuthRedirect();
-    return;
-  }
-
   const token=localStorage.getItem('gToken');
-  const expiry=parseInt(localStorage.getItem('gTokenExpiry')||0);
-  const tokenGültig=token&&Date.now()<expiry;
+  const expiry=Number(localStorage.getItem('gTokenExpiry')||'0');
+  const now=Date.now();
+  const tokenGültig=!!(token&&expiry&&now<expiry);
+
+  console.log('Token check:', {token:!!token, expiry, now, diff:expiry-now, gültig:tokenGültig});
 
   if(tokenGültig){
     state.accessToken=token;
@@ -403,9 +413,16 @@ window.onload=()=>{
     const name=localStorage.getItem('gUserName');
     const pic=localStorage.getItem('gUserPic');
     if(name||pic) showUserBadge(name,pic);
+    fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+token}})
+      .then(r=>r.json()).then(info=>{
+        if(info.name){
+          localStorage.setItem('gUserName',info.name);
+          localStorage.setItem('gUserPic',info.picture||'');
+          showUserBadge(info.name,info.picture);
+        }
+      }).catch(()=>{});
     syncFromDrive();
   } else {
-    // Alten Token aufräumen und Modal zeigen
     clearToken();
     showConnectModal();
   }
@@ -545,6 +562,8 @@ function handleOAuthRedirect(){
   const params=new URLSearchParams(window.location.hash.slice(1));
   const token=params.get('access_token');
   const expiresIn=parseInt(params.get('expires_in')||3600);
+  console.log('OAuth redirect - token:', token?'gefunden':'NICHT gefunden');
+  console.log('Hash:', window.location.hash.substring(0,50));
   if(!token){showConnectModal();return;}
   const expiresAt=Date.now()+(expiresIn-120)*1000;
   localStorage.setItem('gToken',token);
