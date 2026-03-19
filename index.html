@@ -385,9 +385,19 @@ window.onload=()=>{
   document.getElementById('fDatum').value=new Date().toISOString().split('T')[0];
   showHijriDate();
   render();
-  const token=sessionStorage.getItem('gToken');
-  if(token){state.accessToken=token;state.driveConnected=true;updateDriveUI(true);syncFromDrive();}
-  else showConnectModal();
+
+  const token=getValidToken();
+  if(token){
+    state.accessToken=token;state.driveConnected=true;
+    updateDriveUI(true);
+    // Benutzer-Badge wiederherstellen
+    const name=localStorage.getItem('gUserName');
+    const pic=localStorage.getItem('gUserPic');
+    if(name||pic) showUserBadge(name,pic);
+    syncFromDrive();
+  } else {
+    showConnectModal();
+  }
 };
 
 function saveLocal(){localStorage.setItem('zekat_state',JSON.stringify(state));}
@@ -502,28 +512,58 @@ function useLocal(){hideModal();toast('Lokaler Modus aktiv');}
 
 function connectDrive(){
   hideModal();
-  const params=new URLSearchParams({client_id:CLIENT_ID,redirect_uri:window.location.href.split('?')[0].split('#')[0],response_type:'token',scope:SCOPE,include_granted_scopes:'true'});
+  const params=new URLSearchParams({
+    client_id:CLIENT_ID,
+    redirect_uri:window.location.href.split('?')[0].split('#')[0],
+    response_type:'token',
+    scope:SCOPE,
+    include_granted_scopes:'true',
+    prompt:'select_account'
+  });
   window.location.href='https://accounts.google.com/o/oauth2/v2/auth?'+params;
 }
 
+// Token aus URL nach OAuth-Redirect verarbeiten
 (function(){
   const hash=window.location.hash;
   if(!hash.includes('access_token'))return;
   const params=new URLSearchParams(hash.slice(1));
   const token=params.get('access_token');
+  const expiresIn=parseInt(params.get('expires_in')||3600);
   if(!token)return;
-  sessionStorage.setItem('gToken',token);
+  // Token + Ablaufzeit in localStorage speichern (überlebt Browser-Neustart)
+  const expiresAt=Date.now()+(expiresIn-60)*1000;
+  localStorage.setItem('gToken',token);
+  localStorage.setItem('gTokenExpiry',expiresAt);
   state.accessToken=token;state.driveConnected=true;
   window.history.replaceState({},document.title,window.location.pathname);
   updateDriveUI(true);
   fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+token}})
     .then(r=>r.json()).then(info=>{
-      document.getElementById('userBadge').classList.add('show');
-      document.getElementById('userPhoto').src=info.picture||'';
-      document.getElementById('userName').textContent=info.name?.split(' ')[0]||'';
+      localStorage.setItem('gUserName',info.name||'');
+      localStorage.setItem('gUserPic',info.picture||'');
+      showUserBadge(info.name,info.picture);
     }).catch(()=>{});
   syncFromDrive();
 })();
+
+function showUserBadge(name,pic){
+  document.getElementById('userBadge').classList.add('show');
+  document.getElementById('userPhoto').src=pic||'';
+  document.getElementById('userName').textContent=(name||'').split(' ')[0];
+}
+
+function getValidToken(){
+  const token=localStorage.getItem('gToken');
+  const expiry=parseInt(localStorage.getItem('gTokenExpiry')||0);
+  if(!token||Date.now()>expiry){
+    // Token abgelaufen — neu anmelden
+    localStorage.removeItem('gToken');
+    localStorage.removeItem('gTokenExpiry');
+    return null;
+  }
+  return token;
+}
 
 function updateDriveUI(on){
   const btn=document.getElementById('btnConnect');
@@ -532,42 +572,74 @@ function updateDriveUI(on){
     btn.innerHTML=`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Drive aktiv`;
     document.getElementById('statusDot').className='sdot live';
     document.getElementById('statusText').textContent='Synchronisiert';
+  } else {
+    btn.classList.remove('on');
+    btn.innerHTML=`<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg> Drive verbinden`;
+    document.getElementById('statusDot').className='sdot';
+    document.getElementById('statusText').textContent='Nicht verbunden';
   }
 }
 function setStatus(m){
   const d=document.getElementById('statusDot'),t=document.getElementById('statusText');
   if(m==='syncing'){d.className='sdot saving';t.textContent='Speichern…';}
   else if(m==='synced'){d.className='sdot live';t.textContent='Synchronisiert';}
+  else if(m==='error'){d.className='sdot';t.textContent='Sync-Fehler';}
 }
 
 async function syncToDrive(){
-  if(!state.accessToken)return;setStatus('syncing');
+  const token=getValidToken();
+  if(!token){
+    // Token abgelaufen — still fail, Daten sind lokal gespeichert
+    setStatus('error');
+    return;
+  }
+  state.accessToken=token;
+  setStatus('syncing');
   const data=JSON.stringify({gesamt:state.gesamt,payments:state.payments});
   try{
     if(state.driveFileId){
-      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${state.driveFileId}?uploadType=media`,{method:'PATCH',headers:{Authorization:'Bearer '+state.accessToken,'Content-Type':'application/json'},body:data});
+      const r=await fetch(`https://www.googleapis.com/upload/drive/v3/files/${state.driveFileId}?uploadType=media`,{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:data});
+      if(r.status===401){handleTokenExpired();return;}
     }else{
-      const meta=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{Authorization:'Bearer '+state.accessToken,'Content-Type':'application/json'},body:JSON.stringify({name:FILE_NAME,parents:['appDataFolder']})}).then(r=>r.json());
+      const meta=await fetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({name:FILE_NAME,parents:['appDataFolder']})}).then(r=>r.json());
+      if(meta.error){handleTokenExpired();return;}
       state.driveFileId=meta.id;saveLocal();
-      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${meta.id}?uploadType=media`,{method:'PATCH',headers:{Authorization:'Bearer '+state.accessToken,'Content-Type':'application/json'},body:data});
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${meta.id}?uploadType=media`,{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:data});
     }
     setStatus('synced');
-  }catch(e){console.error(e);setStatus('synced');}
+  }catch(e){console.error(e);setStatus('error');}
 }
 
 async function syncFromDrive(){
-  if(!state.accessToken)return;setStatus('syncing');
+  const token=getValidToken();
+  if(!token){handleTokenExpired();return;}
+  state.accessToken=token;
+  setStatus('syncing');
   try{
-    const list=await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${FILE_NAME}'`,{headers:{Authorization:'Bearer '+state.accessToken}}).then(r=>r.json());
+    const list=await fetch(`https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='${FILE_NAME}'`,{headers:{Authorization:'Bearer '+token}}).then(r=>r.json());
+    if(list.error){handleTokenExpired();return;}
     if(list.files&&list.files.length>0){
       const fid=list.files[0].id;state.driveFileId=fid;
-      const c=await fetch(`https://www.googleapis.com/drive/v3/files/${fid}?alt=media`,{headers:{Authorization:'Bearer '+state.accessToken}}).then(r=>r.json());
+      const c=await fetch(`https://www.googleapis.com/drive/v3/files/${fid}?alt=media`,{headers:{Authorization:'Bearer '+token}}).then(r=>r.json());
       state.gesamt=c.gesamt||0;state.payments=c.payments||[];
       document.getElementById('gesamtInput').value=state.gesamt||'';
       saveLocal();render();toast('Daten aus Drive geladen ✓','gold');
     }else{syncToDrive();}
     setStatus('synced');
-  }catch(e){console.error(e);setStatus('synced');}
+  }catch(e){console.error(e);setStatus('error');}
+}
+
+function handleTokenExpired(){
+  localStorage.removeItem('gToken');
+  localStorage.removeItem('gTokenExpiry');
+  state.accessToken=null;state.driveConnected=false;
+  updateDriveUI(false);
+  setStatus('error');
+  // Zeige Hinweis und erneute Anmeldung anbieten
+  const t=document.getElementById('toast');
+  t.innerHTML='Sitzung abgelaufen — <span onclick="connectDrive()" style="text-decoration:underline;cursor:pointer;color:var(--gold2)">Neu anmelden</span>';
+  t.className='toast show error';
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),6000);
 }
 
 function toast(msg,type=''){
