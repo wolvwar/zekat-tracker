@@ -194,6 +194,30 @@ td.acts{text-align:center;width:80px}
 .imp-preview{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:12px;color:var(--text2);margin-bottom:16px;display:none;font-family:monospace;max-height:120px;overflow-y:auto;line-height:1.6}
 .imp-warn{font-size:12px;color:#f87171;margin-bottom:16px;display:none}
 
+/* MENU DROPDOWN */
+.menu-wrap{position:relative}
+.btn-menu{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);color:var(--text2);padding:8px 14px;border-radius:20px;font-size:13px;font-weight:500;font-family:'Inter',sans-serif;cursor:pointer;transition:all .25s}
+.btn-menu:hover{border-color:var(--borderg);color:var(--text)}
+.btn-menu svg{transition:transform .25s}
+.btn-menu.open svg.chevron{transform:rotate(180deg)}
+.dropdown{position:absolute;top:calc(100% + 8px);right:0;background:var(--surface2);border:1px solid var(--borderg);border-radius:14px;padding:6px;min-width:200px;box-shadow:0 16px 48px rgba(0,0,0,.6);z-index:300;display:none;animation:dropIn .2s cubic-bezier(.34,1.56,.64,1)}
+.dropdown.show{display:block}
+@keyframes dropIn{from{opacity:0;transform:translateY(-8px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+.drop-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .15s;background:none;border:none;width:100%;font-family:'Inter',sans-serif;text-align:left}
+.drop-item:hover{background:var(--bg3);color:var(--text)}
+.drop-item.exp:hover{color:var(--gold2)}
+.drop-item.imp:hover{color:var(--green2)}
+.drop-sep{height:1px;background:var(--border);margin:4px 0}
+
+/* TOOLTIP on Drive button */
+.btn-conn-wrap{position:relative}
+.user-tooltip{position:absolute;top:calc(100% + 8px);right:0;background:var(--surface2);border:1px solid var(--borderg);border-radius:12px;padding:12px 16px;min-width:180px;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:300;display:none;white-space:nowrap;pointer-events:none}
+.btn-conn-wrap:hover .user-tooltip.has-user{display:block}
+.ut-pic{width:36px;height:36px;border-radius:50%;object-fit:cover;margin-bottom:8px}
+.ut-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+.ut-email{font-size:11px;color:var(--text3)}
+.ut-status{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--green2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+
 @media(max-width:500px){
   header{padding:0 16px}
   main{padding:28px 14px 80px}
@@ -220,36 +244,80 @@ td.acts{text-align:center;width:80px}
       <div class="sdot" id="statusDot"></div>
       <span id="statusText">Nicht verbunden</span>
     </div>
-    <button class="btn-conn" id="btnConnect" onclick="showConnectModal()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-      Drive verbinden
-    </button>
-    <div class="uchip" id="userBadge">
-      <img id="userPhoto" src="" alt="">
-      <span id="userName"></span>
+
+    <!-- Drive Button mit User-Tooltip -->
+    <div class="btn-conn-wrap">
+      <button class="btn-conn" id="btnConnect" onclick="showConnectModal()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        Drive verbinden
+      </button>
+      <div class="user-tooltip" id="userTooltip">
+        <img class="ut-pic" id="utPic" src="" alt="">
+        <div class="ut-name" id="utName"></div>
+        <div class="ut-email" id="utEmail"></div>
+        <div class="ut-status">
+          <div class="sdot live"></div>
+          Drive aktiv & synchronisiert
+        </div>
+      </div>
     </div>
+
+    <!-- ⋮ Menü oben rechts -->
+    <div class="menu-wrap" id="menuWrap">
+      <button class="btn-menu" id="btnMenu" onclick="toggleMenu()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></svg>
+      </button>
+      <div class="dropdown" id="menuDropdown">
+        <button class="drop-item exp" onclick="exportData();closeMenu()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Daten exportieren
+        </button>
+        <button class="drop-item imp" onclick="document.getElementById('importFile').click();closeMenu()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          Daten importieren
+        </button>
+      </div>
+    </div>
+    <input type="file" id="importFile" accept=".json" onchange="handleImportFile(this)" style="display:none">
   </div>
 </header>
 
 <!-- CONNECT MODAL -->
-<div class="overlay" id="connectModal">
+<div class="overlay" id="connectModal" onclick="handleOverlayClick(event,'connectModal')">
   <div class="modal">
-    <span class="mico">☪</span>
-    <h2>Mit Google Drive verbinden</h2>
-    <p>Deine Zekat-Daten werden sicher in deinem persönlichen Google Drive gespeichert. Niemand außer dir hat Zugriff.</p>
-    <div class="mbtns">
-      <button class="bgoogle" onclick="connectDrive()">
-        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-        Mit Google anmelden
-      </button>
-      <button class="blocal" onclick="useLocal()">Lokal (ohne Drive)</button>
+    <!-- Eingeloggt-Ansicht -->
+    <div id="modalLoggedIn" style="display:none">
+      <img id="modalUserPic" src="" alt="" style="width:64px;height:64px;border-radius:50%;margin-bottom:14px;border:2px solid var(--borderg)">
+      <h2 id="modalUserName" style="margin-bottom:4px"></h2>
+      <p id="modalUserEmail" style="font-size:13px;margin-bottom:24px"></p>
+      <div style="display:flex;align-items:center;gap:8px;justify-content:center;background:var(--greendim);border:1px solid rgba(61,158,88,.3);border-radius:10px;padding:10px 16px;margin-bottom:24px">
+        <div class="sdot live"></div>
+        <span style="font-size:13px;color:var(--green2);font-weight:500">Mit Google Drive verbunden</span>
+      </div>
+      <div class="mbtns">
+        <button class="bcanc" style="border-radius:13px;padding:12px 24px" onclick="hideModal()">Schließen</button>
+        <button class="blocal" onclick="logoutDrive()">Abmelden</button>
+      </div>
     </div>
-    <p style="font-size:11px;margin:20px 0 0;opacity:.35">Nur du hast Zugriff auf deine Daten.</p>
+    <!-- Nicht eingeloggt-Ansicht -->
+    <div id="modalLoggedOut">
+      <span class="mico">☪</span>
+      <h2>Mit Google Drive verbinden</h2>
+      <p>Deine Zekat-Daten werden sicher in deinem persönlichen Google Drive gespeichert. Niemand außer dir hat Zugriff.</p>
+      <div class="mbtns">
+        <button class="bgoogle" onclick="connectDrive()">
+          <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Mit Google anmelden
+        </button>
+        <button class="blocal" onclick="useLocal()">Lokal (ohne Drive)</button>
+      </div>
+      <p style="font-size:11px;margin:20px 0 0;opacity:.35">Nur du hast Zugriff auf deine Daten.</p>
+    </div>
   </div>
 </div>
 
 <!-- EDIT MODAL -->
-<div class="overlay" id="editModal">
+<div class="overlay" id="editModal" onclick="handleOverlayClick(event,'editModal')">
   <div class="modal edit-m">
     <h2>✏ Zahlung bearbeiten</h2>
     <div class="frow">
@@ -340,26 +408,12 @@ td.acts{text-align:center;width:80px}
       </tbody>
     </table>
   </div>
-
-  <!-- EXPORT / IMPORT BAR -->
-  <div class="io-bar">
-    <button class="bio exp" onclick="exportData()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Daten exportieren
-    </button>
-    <button class="bio imp" onclick="document.getElementById('importFile').click()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      Daten importieren
-    </button>
-    <input type="file" id="importFile" accept=".json" onchange="handleImportFile(this)">
-    <span style="font-size:11px;color:var(--text3);margin-left:4px">Backup für andere Geräte oder als Sicherung</span>
-  </div>
 </main>
 
 <div class="toast" id="toast"></div>
 
 <!-- IMPORT MODAL -->
-<div class="overlay" id="importModal">
+<div class="overlay" id="importModal" onclick="handleOverlayClick(event,'importModal')">
   <div class="modal imp-m">
     <h2>📥 Daten importieren</h2>
     <p style="font-size:13px;color:var(--text3);margin-bottom:0">Vorschau der gefundenen Daten:</p>
@@ -401,10 +455,7 @@ window.onload=()=>{
 
   const token=localStorage.getItem('gToken');
   const expiry=Number(localStorage.getItem('gTokenExpiry')||'0');
-  const now=Date.now();
-  const tokenGültig=!!(token&&expiry&&now<expiry);
-
-  console.log('Token check:', {token:!!token, expiry, now, diff:expiry-now, gültig:tokenGültig});
+  const tokenGültig=!!(token&&expiry&&Date.now()<expiry);
 
   if(tokenGültig){
     state.accessToken=token;
@@ -412,13 +463,15 @@ window.onload=()=>{
     updateDriveUI(true);
     const name=localStorage.getItem('gUserName');
     const pic=localStorage.getItem('gUserPic');
-    if(name||pic) showUserBadge(name,pic);
+    const email=localStorage.getItem('gUserEmail');
+    if(name||pic) showUserBadge(name,pic,email);
     fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:'Bearer '+token}})
       .then(r=>r.json()).then(info=>{
         if(info.name){
           localStorage.setItem('gUserName',info.name);
           localStorage.setItem('gUserPic',info.picture||'');
-          showUserBadge(info.name,info.picture);
+          localStorage.setItem('gUserEmail',info.email||'');
+          showUserBadge(info.name,info.picture,info.email);
         }
       }).catch(()=>{});
     syncFromDrive();
@@ -582,8 +635,59 @@ function deletePayment(i){
   });
 }
 
-function showConnectModal(){document.getElementById('connectModal').classList.add('show');}
-function hideModal(){document.getElementById('connectModal').classList.remove('show');document.getElementById('editModal').classList.remove('show');}
+function showConnectModal(){
+  const isLoggedIn=!!getToken();
+  document.getElementById('modalLoggedIn').style.display=isLoggedIn?'block':'none';
+  document.getElementById('modalLoggedOut').style.display=isLoggedIn?'none':'block';
+  if(isLoggedIn){
+    document.getElementById('modalUserPic').src=localStorage.getItem('gUserPic')||'';
+    document.getElementById('modalUserName').textContent=localStorage.getItem('gUserName')||'';
+    document.getElementById('modalUserEmail').textContent=localStorage.getItem('gUserEmail')||'';
+  }
+  document.getElementById('connectModal').classList.add('show');
+}
+function hideModal(){
+  document.getElementById('connectModal').classList.remove('show');
+  document.getElementById('editModal').classList.remove('show');
+  document.getElementById('importModal').classList.remove('show');
+}
+function handleOverlayClick(e,id){
+  if(e.target===document.getElementById(id)) hideModal();
+}
+
+// ESC key closes any open modal
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') hideModal();
+});
+
+// Menu dropdown
+function toggleMenu(){
+  const d=document.getElementById('menuDropdown');
+  const b=document.getElementById('btnMenu');
+  d.classList.toggle('show');
+  b.classList.toggle('open');
+}
+function closeMenu(){
+  document.getElementById('menuDropdown').classList.remove('show');
+  document.getElementById('btnMenu').classList.remove('open');
+}
+// Close menu when clicking outside
+document.addEventListener('click',e=>{
+  const wrap=document.getElementById('menuWrap');
+  if(wrap&&!wrap.contains(e.target)) closeMenu();
+});
+
+function logoutDrive(){
+  if(!confirm('Abmelden? Deine lokalen Daten bleiben erhalten.'))return;
+  clearToken();
+  localStorage.removeItem('gUserName');
+  localStorage.removeItem('gUserPic');
+  localStorage.removeItem('gUserEmail');
+  updateDriveUI(false);
+  hideModal();
+  toast('Abgemeldet');
+}
+
 function useLocal(){hideModal();toast('Lokaler Modus aktiv');}
 
 function connectDrive(){
@@ -623,15 +727,19 @@ function handleOAuthRedirect(){
     .then(r=>r.json()).then(info=>{
       localStorage.setItem('gUserName',info.name||'');
       localStorage.setItem('gUserPic',info.picture||'');
-      showUserBadge(info.name,info.picture);
+      localStorage.setItem('gUserEmail',info.email||'');
+      showUserBadge(info.name,info.picture,info.email);
     }).catch(()=>{});
   syncFromDrive();
 }
 
-function showUserBadge(name,pic){
-  document.getElementById('userBadge').classList.add('show');
-  document.getElementById('userPhoto').src=pic||'';
-  document.getElementById('userName').textContent=(name||'').split(' ')[0];
+function showUserBadge(name,pic,email){
+  // Tooltip befüllen
+  const tooltip=document.getElementById('userTooltip');
+  document.getElementById('utPic').src=pic||'';
+  document.getElementById('utName').textContent=name||'';
+  document.getElementById('utEmail').textContent=email||'';
+  if(name||pic) tooltip.classList.add('has-user');
 }
 
 function getToken(){
